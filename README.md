@@ -29,5 +29,13 @@ For a quick, non-persistent run, use `-Mini`. It runs 64 connections for one
 three-second measurement after a one-second warmup, skips the idle wait, and
 prints the summary without creating files under `benchmarks\results\`.
 
+To verify that the selected apps can be built/published without starting them
+or running a load test, use `-BuildOnly`. This does not require `bombardier` and
+does not create benchmark result files:
+
+```powershell
+.\scripts\RunBenchmarks.ps1 -BuildOnly
+```
+
 The script rebuilds selected apps under `benchmarks\build\`. It runs the load
 generator locally, so the results also reflect contention for local resources.

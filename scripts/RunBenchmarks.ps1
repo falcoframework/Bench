@@ -7,6 +7,7 @@ For each app: build/publish, start, measure startup time, warm up, run the load
 test N times, record peak and idle memory, then stop. Writes a markdown summary
 and raw JSON to benchmarks/results/<timestamp>/.
 Use -Mini for a short run that displays the summary without saving result files.
+Use -BuildOnly to build/publish the selected apps without starting or benchmarking them.
 
 .NOTES
 Requires bombardier on PATH. Go apps need `go`, .NET apps need `dotnet`.
@@ -18,6 +19,9 @@ Run the load generator on a separate machine for the most credible numbers.
 
 .EXAMPLE
 ./RunBenchmarks.ps1 -Mini
+
+.EXAMPLE
+./RunBenchmarks.ps1 -BuildOnly
 #>
 [CmdletBinding()]
 param(
@@ -29,7 +33,8 @@ param(
     [int] $IdleSeconds = 30,
     [int] $Port = 5000,
     [string] $Configuration = "Release",
-    [switch] $Mini
+    [switch] $Mini,
+    [switch] $BuildOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,11 +54,11 @@ $resultsDir = Join-Path $root "results\$stamp"
 $buildDir = Join-Path $root "build"
 $url = "http://127.0.0.1:$Port/"
 
-if (-not (Get-Command bombardier -ErrorAction SilentlyContinue)) {
+if (-not $BuildOnly -and -not (Get-Command bombardier -ErrorAction SilentlyContinue)) {
     throw "bombardier not found on PATH. Install from https://github.com/codesenberg/bombardier"
 }
 
-if (-not $Mini) {
+if (-not $Mini -and -not $BuildOnly) {
     New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
 }
 
@@ -204,11 +209,17 @@ foreach ($app in $available) {
     Write-Host "`n=== $name ($kind) ===" -ForegroundColor Cyan
 
     if ($kind -eq "go" -and -not (Get-Command go -ErrorAction SilentlyContinue)) {
+        if ($BuildOnly) { throw "go not found on PATH; cannot build $name" }
         Write-Warning "go not found; skipping $name"
         continue
     }
 
     $artifact = Build-App $name $app.FullName $kind
+    if ($BuildOnly) {
+        Write-Host "Built successfully: $($artifact.Out)" -ForegroundColor Green
+        continue
+    }
+
     $sizeMb = Get-DirSizeMb $artifact.Out
 
     foreach ($conn in $Connections) {
@@ -258,6 +269,11 @@ foreach ($app in $available) {
             if (-not $proc.HasExited) { $proc.Kill($true); $proc.WaitForExit() }
         }
     }
+}
+
+if ($BuildOnly) {
+    Write-Host "`nBuild-only check passed for $($available.Count) app(s)." -ForegroundColor Green
+    return
 }
 
 $envInfo = @(
