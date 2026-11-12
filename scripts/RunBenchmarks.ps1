@@ -6,6 +6,7 @@ Builds and benchmarks the apps in benchmarks/apps using bombardier.
 For each app: build/publish, start, measure startup time, warm up, run the load
 test N times, record peak and idle memory, then stop. Writes a markdown summary
 and raw JSON to benchmarks/results/<timestamp>/.
+Use -Mini for a short run that displays the summary without saving result files.
 
 .NOTES
 Requires bombardier on PATH. Go apps need `go`, .NET apps need `dotnet`.
@@ -14,6 +15,9 @@ Run the load generator on a separate machine for the most credible numbers.
 
 .EXAMPLE
 ./RunBenchmarks.ps1 -Apps FalcoBench,GoBench -Connections 64,256 -Runs 5
+
+.EXAMPLE
+./RunBenchmarks.ps1 -Mini
 #>
 [CmdletBinding()]
 param(
@@ -24,10 +28,19 @@ param(
     [int] $Runs = 3,
     [int] $IdleSeconds = 30,
     [int] $Port = 5000,
-    [string] $Configuration = "Release"
+    [string] $Configuration = "Release",
+    [switch] $Mini
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Mini) {
+    $Connections = @(64)
+    $DurationSeconds = 3
+    $WarmupSeconds = 1
+    $Runs = 1
+    $IdleSeconds = 0
+}
 
 $root = Split-Path -Parent $PSScriptRoot
 $appsDir = Join-Path $root "apps"
@@ -40,7 +53,9 @@ if (-not (Get-Command bombardier -ErrorAction SilentlyContinue)) {
     throw "bombardier not found on PATH. Install from https://github.com/codesenberg/bombardier"
 }
 
-New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
+if (-not $Mini) {
+    New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
+}
 
 function Get-AppKind($dir) {
     if (Get-ChildItem $dir -Filter *.fsproj -ErrorAction SilentlyContinue) { return "dotnet" }
@@ -206,13 +221,15 @@ foreach ($app in $available) {
             $runResults = @()
             for ($i = 1; $i -le $Runs; $i++) {
                 Write-Host "Run $i/$Runs at $conn connections for ${DurationSeconds}s"
-                $file = Join-Path $resultsDir "$name-c$conn-run$i.json"
+                $file = if ($Mini) { $null } else { Join-Path $resultsDir "$name-c$conn-run$i.json" }
                 $runResults += Invoke-Bombardier $conn $DurationSeconds $file
             }
 
             $peak = Get-PeakMemMb $proc
-            Write-Host "Idling ${IdleSeconds}s to observe memory release..."
-            Start-Sleep -Seconds $IdleSeconds
+            if ($IdleSeconds -gt 0) {
+                Write-Host "Idling ${IdleSeconds}s to observe memory release..."
+                Start-Sleep -Seconds $IdleSeconds
+            }
             $idle = Get-MemMb $proc
 
             $failed = ($runResults | ForEach-Object { $_.result.req1xx + $_.result.req3xx + $_.result.req4xx + $_.result.req5xx + $_.result.others } | Measure-Object -Sum).Sum
@@ -277,13 +294,20 @@ foreach ($group in @($table | Group-Object Connections)) {
     $md += Format-MarkdownTable $group.Group $resourceColumns
 }
 
-$mdPath = Join-Path $resultsDir "summary.md"
-$jsonPath = Join-Path $resultsDir "summary.json"
-$md | Set-Content $mdPath
-$summary | ConvertTo-Json | Set-Content $jsonPath
+if ($Mini) {
+    $md
+}
+else {
+    Write-Host "`n$($md -join "`n")"
+}
+if (-not $Mini) {
+    $mdPath = Join-Path $resultsDir "summary.md"
+    $jsonPath = Join-Path $resultsDir "summary.json"
+    $md | Set-Content $mdPath
+    $summary | ConvertTo-Json | Set-Content $jsonPath
 
-Write-Host "`n$($md -join "`n")"
-Write-Host "`nResults written to $resultsDir" -ForegroundColor Green
-Write-Host "  Markdown summary: $mdPath"
-Write-Host "  JSON summary:     $jsonPath"
-Write-Host "  Raw run JSON:     $($summary.Count * $Runs) files in $resultsDir"
+    Write-Host "`nResults written to $resultsDir" -ForegroundColor Green
+    Write-Host "  Markdown summary: $mdPath"
+    Write-Host "  JSON summary:     $jsonPath"
+    Write-Host "  Raw run JSON:     $($summary.Count * $Runs) files in $resultsDir"
+}
