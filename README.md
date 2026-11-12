@@ -16,7 +16,7 @@ Run the benchmark script with PowerShell 7, with `bombardier`, `dotnet`, and
 For example, to benchmark specific apps and connection counts:
 
 ```powershell
-.\benchmarks\scripts\RunBenchmarks.ps1 -Apps FalcoBench,GoBench -Connections 64,256 -Runs 5
+.\benchmarks\scripts\RunBenchmarks.ps1 -Apps FalcoBench,FrankBench,GiraffeBench,GiraffeEndpointsBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
 ```
 
 Results are saved under `benchmarks\results\<timestamp>\`. The script prints

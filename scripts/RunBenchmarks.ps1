@@ -14,7 +14,7 @@ The script sets ASPNETCORE_URLS (.NET apps) and PORT (Go apps) from -Port.
 Run the load generator on a separate machine for the most credible numbers.
 
 .EXAMPLE
-./RunBenchmarks.ps1 -Apps FalcoBench,GoBench -Connections 64,256 -Runs 5
+./RunBenchmarks.ps1 -Apps FalcoBench,FrankBench,GiraffeBench,GiraffeEndpointsBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
 
 .EXAMPLE
 ./RunBenchmarks.ps1 -Mini
