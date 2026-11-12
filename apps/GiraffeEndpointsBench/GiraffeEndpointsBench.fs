@@ -28,3 +28,5 @@ app.UseEndpoints(fun endpointBuilder -> endpointBuilder.MapGiraffeEndpoints(endp
 app.Run(fun ctx ->
     ctx.Response.ContentType <- "text/plain"
     ctx.Response.WriteAsync("Not found"))
+
+app.Run()

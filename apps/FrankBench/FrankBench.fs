@@ -30,7 +30,10 @@ let notFound (app: IApplicationBuilder) =
 let args = Environment.GetCommandLineArgs()
 
 webHost args {
-    configure (fun builder -> builder.ConfigureLogging(fun logging -> logging.ClearProviders() |> ignore))
+    configure (fun builder ->
+        builder
+            .UseKestrel()
+            .ConfigureLogging(fun logging -> logging.ClearProviders() |> ignore))
     plug notFound
     resource home
 }

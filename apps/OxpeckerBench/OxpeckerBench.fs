@@ -27,3 +27,5 @@ app.UseRouting().UseOxpecker(endpoints) |> ignore
 app.Run(fun ctx ->
     ctx.Response.ContentType <- "text/plain"
     ctx.Response.WriteAsync("Not found"))
+
+app.Run()

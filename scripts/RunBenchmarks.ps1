@@ -15,7 +15,7 @@ The script sets ASPNETCORE_URLS (.NET apps) and PORT (Go apps) from -Port.
 Run the load generator on a separate machine for the most credible numbers.
 
 .EXAMPLE
-./RunBenchmarks.ps1 -Apps FalcoBench,FrankBench,GiraffeBench,GiraffeEndpointsBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
+./RunBenchmarks.ps1 -Apps AspNetMvcBench,AspNetRazorPages,FalcoBench,FrankBench,GiraffeBench,GiraffeEndpointsBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
 
 .EXAMPLE
 ./RunBenchmarks.ps1 -Mini
@@ -41,7 +41,7 @@ $ErrorActionPreference = "Stop"
 
 if ($Mini) {
     $Connections = @(64)
-    $DurationSeconds = 3
+    $DurationSeconds = 30
     $WarmupSeconds = 1
     $Runs = 1
     $IdleSeconds = 0
@@ -251,18 +251,18 @@ foreach ($app in $available) {
             $p99 = $runResults | ForEach-Object { $_.result.latency.percentiles.'99' }
 
             $summary.Add([pscustomobject]@{
-                    App          = $name
-                    Connections  = $conn
-                    RpsMedian    = [math]::Round((Get-Median $rps))
-                    RpsMin       = [math]::Round(($rps | Measure-Object -Minimum).Minimum)
-                    RpsMax       = [math]::Round(($rps | Measure-Object -Maximum).Maximum)
-                    P50Ms        = [math]::Round((Get-Median $p50) / 1000, 2)
-                    P99Ms        = [math]::Round((Get-Median $p99) / 1000, 2)
-                    PeakMemMb    = $peak
-                    IdleMemMb    = $idle
-                    StartupMs    = $started.StartupMs
-                    PublishMb    = $sizeMb
-                    NonOkReqs    = $failed
+                    App         = $name
+                    Connections = $conn
+                    RpsMedian   = [math]::Round((Get-Median $rps))
+                    RpsMin      = [math]::Round(($rps | Measure-Object -Minimum).Minimum)
+                    RpsMax      = [math]::Round(($rps | Measure-Object -Maximum).Maximum)
+                    P50Ms       = [math]::Round((Get-Median $p50) / 1000, 2)
+                    P99Ms       = [math]::Round((Get-Median $p99) / 1000, 2)
+                    PeakMemMb   = $peak
+                    IdleMemMb   = $idle
+                    StartupMs   = $started.StartupMs
+                    PublishMb   = $sizeMb
+                    NonOkReqs   = $failed
                 })
         }
         finally {
@@ -307,7 +307,8 @@ foreach ($group in @($table | Group-Object Connections)) {
     $md += @("", "## $($group.Name) connections", "", "Throughput and latency", "")
     $md += Format-MarkdownTable $group.Group $throughputColumns
     $md += @("", "Resources and responses", "")
-    $md += Format-MarkdownTable $group.Group $resourceColumns
+    $resourceRows = $group.Group | Sort-Object PeakMemMb
+    $md += Format-MarkdownTable $resourceRows $resourceColumns
 }
 
 if ($Mini) {

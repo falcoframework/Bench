@@ -1,0 +1,12 @@
+<Project>
+    <PropertyGroup>
+        <PublishTrimmed>false</PublishTrimmed>
+        <SelfContained>true</SelfContained>
+        <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
+        <PublishSingleFile>true</PublishSingleFile>
+        <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <UseSystemResourceKeys>true</UseSystemResourceKeys>
+        <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    </PropertyGroup>
+</Project>
