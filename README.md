@@ -50,7 +50,7 @@ does not create benchmark result files:
 The script rebuilds selected apps under `build\`. It runs the load
 generator locally, so the results also reflect contention for local resources.
 
-## Results (2026/11/12)
+## Results
 
 - Date: 2026-11-12 13:41:42Z
 - OS: Microsoft Windows 10.0.19045
