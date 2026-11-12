@@ -20,6 +20,10 @@ let template (dt : DateTime) =
             _p' (sprintf "Current time is %s" (dt.ToString "R"))
         ]
     ]
+// let template (dt: DateTime) =
+//     sprintf
+//         "<html><head><title>Hello</title></head><body><h1>Hello World!</h1><p>Current time is %s</p></body></html>"
+//         (dt.ToString "R")
 
 wapp.UseRouting()
     .UseFalco([

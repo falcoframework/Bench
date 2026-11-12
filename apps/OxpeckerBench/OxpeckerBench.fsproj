@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <PackageReference Include="Oxpecker" Version="2.1.1"/>
+    <PackageReference Include="Oxpecker.ViewEngine" Version="2.1.0"/>
   </ItemGroup>
 
   <ItemGroup>

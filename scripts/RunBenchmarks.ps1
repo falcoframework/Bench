@@ -41,10 +41,10 @@ $ErrorActionPreference = "Stop"
 
 if ($Mini) {
     $Connections = @(64)
-    $DurationSeconds = 30
-    $WarmupSeconds = 1
+    $DurationSeconds = 10
+    $WarmupSeconds = 5
     $Runs = 1
-    $IdleSeconds = 0
+    $IdleSeconds = 1
 }
 
 $root = Split-Path -Parent $PSScriptRoot

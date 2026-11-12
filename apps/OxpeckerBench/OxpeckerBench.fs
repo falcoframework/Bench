@@ -4,20 +4,25 @@ open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open Oxpecker
+open Oxpecker.ViewEngine
 
 let builder = WebApplication.CreateSlimBuilder()
 builder.Logging.ClearProviders() |> ignore
 builder.Services.AddRouting().AddOxpecker() |> ignore
 
 let template (dt: DateTime) =
-    sprintf
-        "<html><head><title>Hello</title></head><body><h1>Hello World!</h1><p>Current time is %s</p></body></html>"
-        (dt.ToString "R")
+    html() {
+        head() { title() { "Hello" } }
+        body() {
+            h1() { "Hello World!" }
+            p() { sprintf "Current time is %s" (dt.ToString "R") }
+        }
+    }
 
 let home: EndpointHandler =
     fun ctx ->
         ctx.Response.ContentType <- "text/html"
-        ctx.Response.WriteAsync(template DateTime.UtcNow)
+        ctx.Response.WriteAsync(template DateTime.UtcNow |> Render.toString)
 
 let endpoints = [ GET [ route "/" home ] ]
 
