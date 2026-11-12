@@ -25,5 +25,9 @@ a raw `<app>-c<connections>-run<run>.json` file in the same directory.
 The Markdown summary groups results by connection count and separates
 throughput and latency from resources and response counts for readability.
 
+For a quick, non-persistent run, use `-Mini`. It runs 64 connections for one
+three-second measurement after a one-second warmup, skips the idle wait, and
+prints the summary without creating files under `benchmarks\results\`.
+
 The script rebuilds selected apps under `benchmarks\build\`. It runs the load
 generator locally, so the results also reflect contention for local resources.
