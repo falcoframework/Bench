@@ -154,7 +154,7 @@ function Invoke-Bombardier($scenario, $connections, $seconds, $outFile) {
 
     $json = & bombardier @args
     if ($LASTEXITCODE -ne 0) { throw "bombardier failed" }
-    if ($outFile) { $json | Set-Content $outFile }
+    if ($outFile) { [IO.File]::WriteAllLines($outFile, [string[]]@($json ?? @())) }
     return ($json -join "`n") | ConvertFrom-Json
 }
 
@@ -345,8 +345,8 @@ else {
 if (-not $Mini) {
     $mdPath = Join-Path $resultsDir "summary.md"
     $jsonPath = Join-Path $resultsDir "summary.json"
-    $md | Set-Content $mdPath
-    $summary | ConvertTo-Json | Set-Content $jsonPath
+    [IO.File]::WriteAllLines($mdPath, [string[]]$md)
+    if ($summary.Count -gt 0) { [IO.File]::WriteAllText($jsonPath, ($summary | ConvertTo-Json) + [Environment]::NewLine) }
 
     Write-Host "`nResults written to $resultsDir" -ForegroundColor Green
     Write-Host "  Markdown summary: $mdPath"
