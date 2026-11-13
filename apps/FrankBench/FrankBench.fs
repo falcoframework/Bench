@@ -7,27 +7,46 @@ open Microsoft.Extensions.Logging
 open Frank.Builder
 open Falco.Markup
 
-let template (dt: DateTime) =
+type Message = { msg: string }
+
+let message () =
+    { msg = sprintf "Current time is %s" (DateTime.UtcNow.ToString "R") }
+
+let template (body : XmlNode list) =
     _html [] [
-        _head [] [ _title [] [ _text "Hello" ] ]
-        _body [] [
-            _h1' "Hello World!"
-            _p' (sprintf "Current time is %s" (dt.ToString "R"))
+        _head [] [
+            _title [] [ _text "Hello" ]
         ]
+        _body [] body
+    ]
+
+let indexTemplate message =
+    template  [
+        _h1' "Hello World!"
+        _p' message
     ]
 
 let home =
     resource "/" {
         name "Home"
         get (fun (ctx: HttpContext) ->
-            ctx.Response.ContentType <- "text/html"
-            ctx.Response.WriteAsync(template DateTime.UtcNow |> renderNode))
+            ctx.Response.ContentType <- "text/html; charset=utf-8"
+            ctx.Response.WriteAsync(indexTemplate (message().msg) |> renderNode))
+    }
+
+let text =
+    resource "/text" {
+        name "Text"
+        get (fun (ctx: HttpContext) ->
+            ctx.Response.ContentType <- "text/html; charset=utf-8"
+            ctx.Response.WriteAsync(message().msg))
     }
 
 let notFound (app: IApplicationBuilder) =
     app.Use(fun (ctx: HttpContext) (next: Func<Task>) ->
         if isNull (ctx.GetEndpoint()) then
-            ctx.Response.ContentType <- "text/plain"
+            ctx.Response.StatusCode <- 404
+            ctx.Response.ContentType <- "text/html; charset=utf-8"
             ctx.Response.WriteAsync("Not found")
         else
             next.Invoke())
@@ -41,4 +60,5 @@ webHost args {
             .ConfigureLogging(fun logging -> logging.ClearProviders() |> ignore))
     plug notFound
     resource home
+    resource text
 }

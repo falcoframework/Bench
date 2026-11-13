@@ -2,8 +2,14 @@ var builder = WebApplication.CreateSlimBuilder(args);
 builder.Logging.ClearProviders();
 builder.Services.AddRazorPages();
 
-var app = builder.Build();
+var wapp = builder.Build();
 
-app.MapRazorPages();
+wapp.MapRazorPages();
 
-app.Run();
+wapp.MapGet("/text", () => $"Current time is {DateTime.Now}");
+
+wapp.MapGet("/json", () => new Message(msg: "Hello"));
+
+wapp.Run();
+
+public sealed record Message(string msg);

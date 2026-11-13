@@ -15,7 +15,7 @@ The script sets ASPNETCORE_URLS (.NET apps) and PORT (Go apps) from -Port.
 Run the load generator on a separate machine for the most credible numbers.
 
 .EXAMPLE
-./RunBenchmarks.ps1 -Apps AspNetMvcBench,AspNetRazorPages,FalcoBench,FrankBench,GiraffeBench,GiraffeEndpointsBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
+./RunBenchmarks.ps1 -Apps AspNetMvcBench,AspNetRazorPages,FalcoBench,FrankBench,GiraffeBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
 
 .EXAMPLE
 ./RunBenchmarks.ps1 -Mini
@@ -26,25 +26,25 @@ Run the load generator on a separate machine for the most credible numbers.
 [CmdletBinding()]
 param(
     [string[]] $Apps,
-    [int[]] $Connections = @(64, 256),
-    [int] $DurationSeconds = 30,
-    [int] $WarmupSeconds = 10,
+    [int[]] $Connections = @(100, 250),
+    [int] $DurationSeconds = 10,
+    [int] $WarmupSeconds = 5,
     [int] $Runs = 3,
-    [int] $IdleSeconds = 30,
+    [int] $IdleSeconds = 10,
     [int] $Port = 5000,
     [string] $Configuration = "Release",
     [switch] $Mini,
     [switch] $BuildOnly
 )
 
-$ErrorActionPreference = "Stop"
+# $ErrorActionPreference = "Stop"
 
 if ($Mini) {
-    $Connections = @(64)
+    $Connections = @(100)
     $DurationSeconds = 10
-    $WarmupSeconds = 5
+    $WarmupSeconds = 3
     $Runs = 1
-    $IdleSeconds = 1
+    $IdleSeconds = 3
 }
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -149,8 +149,9 @@ function Get-PeakMemMb($proc) {
     [math]::Round($proc.PeakWorkingSet64 / 1MB, 1)
 }
 
-function Invoke-Bombardier($connections, $seconds, $outFile) {
-    $args = @("-c", $connections, "-d", "${seconds}s", "-l", "-p", "r", "-o", "json", $url)
+function Invoke-Bombardier($scenario, $connections, $seconds, $outFile) {
+    $args = @("-c", $connections, "-d", "${seconds}s", "-l", "-p", "r", "-o", "json", $scenario.Url)
+
     $json = & bombardier @args
     if ($LASTEXITCODE -ne 0) { throw "bombardier failed" }
     if ($outFile) { $json | Set-Content $outFile }
@@ -197,9 +198,27 @@ function Format-MarkdownTable($rows, $columns) {
 }
 
 # Discover apps: anything under apps/ that looks buildable.
-$available = Get-ChildItem $appsDir -Directory | Where-Object { Get-AppKind $_.FullName }
+$available = Get-ChildItem $appsDir -Directory | Where-Object { $_.Name -ne "GiraffeEndpointsBench" -and (Get-AppKind $_.FullName) }
 if ($Apps) { $available = $available | Where-Object { $Apps -contains $_.Name } }
 if (-not $available) { throw "No apps found to benchmark in $appsDir" }
+
+$scenarios = @(
+    @{
+        Name   = "GET /"
+        Url    = $url
+        Suffix = ""
+    }
+    @{
+        Name   = "GET /text"
+        Url    = "${url}text"
+        Suffix = "-text"
+    }
+    # @{
+    #     Name   = "GET /json"
+    #     Url    = "${url}json"
+    #     Suffix = "-json"
+    # }
+)
 
 $summary = New-Object System.Collections.Generic.List[object]
 
@@ -222,51 +241,55 @@ foreach ($app in $available) {
 
     $sizeMb = Get-DirSizeMb $artifact.Out
 
-    foreach ($conn in $Connections) {
-        $started = Start-App $artifact $kind
-        $proc = $started.Process
-        try {
-            Write-Host "Started in $($started.StartupMs) ms. Warming up for ${WarmupSeconds}s..."
-            $null = Invoke-Bombardier $conn $WarmupSeconds $null
+    foreach ($scenario in $scenarios) {
+        foreach ($conn in $Connections) {
+            $started = Start-App $artifact $kind
+            $proc = $started.Process
+            try {
+                Write-Host "Started in $($started.StartupMs) ms. Warming up $($scenario.Name) for ${WarmupSeconds}s..."
+                $null = Invoke-Bombardier $scenario $conn $WarmupSeconds $null
 
-            $runResults = @()
-            for ($i = 1; $i -le $Runs; $i++) {
-                Write-Host "Run $i/$Runs at $conn connections for ${DurationSeconds}s"
-                $file = if ($Mini) { $null } else { Join-Path $resultsDir "$name-c$conn-run$i.json" }
-                $runResults += Invoke-Bombardier $conn $DurationSeconds $file
+                $runResults = @()
+                for ($i = 1; $i -le $Runs; $i++) {
+                    Write-Host "Run $i/$Runs of $($scenario.Name) at $conn connections for ${DurationSeconds}s"
+                    $fileName = "$name$($scenario.Suffix)-c$conn-run$i.json"
+                    $file = if ($Mini) { $null } else { Join-Path $resultsDir $fileName }
+                    $runResults += Invoke-Bombardier $scenario $conn $DurationSeconds $file
+                }
+
+                $peak = Get-PeakMemMb $proc
+                if ($IdleSeconds -gt 0) {
+                    Write-Host "Idling ${IdleSeconds}s to observe memory release..."
+                    Start-Sleep -Seconds $IdleSeconds
+                }
+                $idle = Get-MemMb $proc
+
+                $failed = ($runResults | ForEach-Object { $_.result.req1xx + $_.result.req3xx + $_.result.req4xx + $_.result.req5xx + $_.result.others } | Measure-Object -Sum).Sum
+                $rps = $runResults | ForEach-Object { $_.result.rps.mean }
+
+                # Bombardier reports latency percentiles in microseconds.
+                $p50 = $runResults | ForEach-Object { $_.result.latency.percentiles.'50' }
+                $p99 = $runResults | ForEach-Object { $_.result.latency.percentiles.'99' }
+
+                $summary.Add([pscustomobject]@{
+                        App         = $name
+                        Scenario    = $scenario.Name
+                        Connections = $conn
+                        RpsMedian   = [math]::Round((Get-Median $rps))
+                        RpsMin      = [math]::Round(($rps | Measure-Object -Minimum).Minimum)
+                        RpsMax      = [math]::Round(($rps | Measure-Object -Maximum).Maximum)
+                        P50Ms       = [math]::Round((Get-Median $p50) / 1000, 2)
+                        P99Ms       = [math]::Round((Get-Median $p99) / 1000, 2)
+                        PeakMemMb   = $peak
+                        IdleMemMb   = $idle
+                        StartupMs   = $started.StartupMs
+                        PublishMb   = $sizeMb
+                        NonOkReqs   = $failed
+                    })
             }
-
-            $peak = Get-PeakMemMb $proc
-            if ($IdleSeconds -gt 0) {
-                Write-Host "Idling ${IdleSeconds}s to observe memory release..."
-                Start-Sleep -Seconds $IdleSeconds
+            finally {
+                if (-not $proc.HasExited) { $proc.Kill($true); $proc.WaitForExit() }
             }
-            $idle = Get-MemMb $proc
-
-            $failed = ($runResults | ForEach-Object { $_.result.req1xx + $_.result.req3xx + $_.result.req4xx + $_.result.req5xx + $_.result.others } | Measure-Object -Sum).Sum
-            $rps = $runResults | ForEach-Object { $_.result.rps.mean }
-
-            # Bombardier reports latency percentiles in microseconds.
-            $p50 = $runResults | ForEach-Object { $_.result.latency.percentiles.'50' }
-            $p99 = $runResults | ForEach-Object { $_.result.latency.percentiles.'99' }
-
-            $summary.Add([pscustomobject]@{
-                    App         = $name
-                    Connections = $conn
-                    RpsMedian   = [math]::Round((Get-Median $rps))
-                    RpsMin      = [math]::Round(($rps | Measure-Object -Minimum).Minimum)
-                    RpsMax      = [math]::Round(($rps | Measure-Object -Maximum).Maximum)
-                    P50Ms       = [math]::Round((Get-Median $p50) / 1000, 2)
-                    P99Ms       = [math]::Round((Get-Median $p99) / 1000, 2)
-                    PeakMemMb   = $peak
-                    IdleMemMb   = $idle
-                    StartupMs   = $started.StartupMs
-                    PublishMb   = $sizeMb
-                    NonOkReqs   = $failed
-                })
-        }
-        finally {
-            if (-not $proc.HasExited) { $proc.Kill($true); $proc.WaitForExit() }
         }
     }
 }
@@ -285,9 +308,10 @@ $envInfo = @(
     "- Duration: ${DurationSeconds}s x $Runs runs (median reported), warmup ${WarmupSeconds}s, idle ${IdleSeconds}s"
 )
 
-$table = $summary | Sort-Object Connections, @{ Expression = "RpsMedian"; Descending = $true }
+$table = $summary | Sort-Object Connections, Scenario, @{ Expression = "RpsMedian"; Descending = $true }
 $throughputColumns = @(
     @{ Header = "App"; Property = "App" }
+    @{ Header = "Scenario"; Property = "Scenario" }
     @{ Header = "Req/s median"; Property = "RpsMedian"; Numeric = $true }
     @{ Header = "min"; Property = "RpsMin"; Numeric = $true }
     @{ Header = "max"; Property = "RpsMax"; Numeric = $true }
@@ -296,6 +320,7 @@ $throughputColumns = @(
 )
 $resourceColumns = @(
     @{ Header = "App"; Property = "App" }
+    @{ Header = "Scenario"; Property = "Scenario" }
     @{ Header = "Peak MB"; Property = "PeakMemMb"; Numeric = $true }
     @{ Header = "Idle MB"; Property = "IdleMemMb"; Numeric = $true }
     @{ Header = "Startup ms"; Property = "StartupMs"; Numeric = $true }

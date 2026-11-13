@@ -18,7 +18,7 @@ Run the benchmark script with PowerShell 7, with `bombardier`, `dotnet`, and
 For example, to benchmark specific apps and connection counts:
 
 ```powershell
-.\scripts\RunBenchmarks.ps1 -Apps AspNetMvcBench,AspNetRazorPages,FalcoBench,FrankBench,GiraffeBench,GiraffeEndpointsBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
+.\scripts\RunBenchmarks.ps1 -Apps AspNetMvcBench,AspNetRazorPages,FalcoBench,FrankBench,GiraffeBench,GoBench,OxpeckerBench,RazorSlicesBench -Connections 64,256 -Runs 5
 ```
 
 `AspNetMvcBench` benchmarks ASP.NET Core MVC, and `AspNetRazorPages` benchmarks
@@ -31,12 +31,16 @@ Oxpecker.ViewEngine, and Frank uses Falco.Markup.
 
 Results are saved under `results\<timestamp>\`. The script prints
 the full paths to `summary.md` and `summary.json`; each measured run also has
-a raw `<app>-c<connections>-run<run>.json` file in the same directory.
+a raw `<app>-c<connections>-run<run>.json` file for `GET /`, or
+`<app>-text-c<connections>-run<run>.json` and
+`<app>-json-c<connections>-run<run>.json` for `GET /text` and `GET /json`.
+All three scenarios run for every selected app and connection count.
+`GiraffeEndpointsBench` is excluded until its endpoints are updated.
 The Markdown summary groups results by connection count and separates
 throughput and latency from resources and response counts for readability.
 
 For a quick, non-persistent run, use `-Mini`. It runs 64 connections for one
-30-second measurement after a one-second warmup, skips the idle wait, and
+10-second measurement after a five-second warmup, waits one second for idle memory, and
 prints the summary without creating files under `results\`.
 
 To verify that the selected apps can be built/published without starting them

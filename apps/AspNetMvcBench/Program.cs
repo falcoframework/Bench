@@ -1,13 +1,17 @@
-using Microsoft.AspNetCore.Mvc;
-
 var builder = WebApplication.CreateSlimBuilder(args);
 builder.Logging.ClearProviders();
 builder.Services.AddControllersWithViews();
 
-var app = builder.Build();
+var wapp = builder.Build();
 
-app.MapControllerRoute(
+wapp.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.Run();
+wapp.MapGet("/text", () => $"Current time is {DateTime.Now}");
+
+wapp.MapGet("/json", () => new Message(msg: "Hello"));
+
+wapp.Run();
+
+public sealed record Message(string msg);

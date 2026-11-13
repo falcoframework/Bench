@@ -8,5 +8,6 @@
         <InvariantGlobalization>true</InvariantGlobalization>
         <UseSystemResourceKeys>true</UseSystemResourceKeys>
         <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+        <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     </PropertyGroup>
 </Project>

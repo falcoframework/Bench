@@ -7,23 +7,36 @@ open Giraffe
 open Giraffe.EndpointRouting
 open Giraffe.ViewEngine
 
-let builder = WebApplication.CreateSlimBuilder()
-builder.Logging.ClearProviders() |> ignore
-builder.Services.AddRouting() |> ignore
+type Message = { msg: string }
 
-let template (dt: DateTime) =
+let message () =
+    { msg = sprintf "Current time is %s" (DateTime.UtcNow.ToString "R") }
+
+let template body' =
     html [] [
         head [] [ title [] [ str "Hello" ] ]
-        body [] [
-            h1 [] [ str "Hello World!" ]
-            p [] [ str (sprintf "Current time is %s" (dt.ToString "R")) ]
-        ]
+        body [] body'
+    ]
+
+
+let indexTemplate message =
+    template [
+        h1 [] [ str "Hello World!" ]
+        p [] [ str message ]
     ]
 
 let home: HttpHandler =
-    fun next ctx -> htmlString (template DateTime.UtcNow |> RenderView.AsString.htmlNode) next ctx
+    fun next ctx -> htmlString (indexTemplate (message().msg) |> RenderView.AsString.htmlNode) next ctx
 
-let endpoints = [ GET [ route "/" home ] ]
+let endpoints = [
+    GET [ route "/" home ]
+    GET [ route "/text" (setHttpHeader "Content-Type" "text/plain; charset=utf-8" >=> text (message().msg)) ]
+    GET [ route "/json" (setHttpHeader "Content-Type" "application/json" >=> jsonChunked (message())) ]
+]
+
+let builder = WebApplication.CreateSlimBuilder()
+builder.Logging.ClearProviders() |> ignore
+builder.Services.AddRouting() |> ignore
 
 let app = builder.Build()
 
@@ -31,6 +44,7 @@ app.UseRouting() |> ignore
 app.UseEndpoints(fun endpointBuilder -> endpointBuilder.MapGiraffeEndpoints(endpoints))
 |> ignore
 app.Run(fun ctx ->
+    ctx.Response.StatusCode <- 404
     ctx.Response.ContentType <- "text/plain"
     ctx.Response.WriteAsync("Not found"))
 
